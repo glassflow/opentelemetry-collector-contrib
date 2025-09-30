@@ -1,0 +1,20 @@
+exporters:
+  glassflow:
+    brokers: ["localhost:9092"]
+    traces:
+      topic: glassflow_traces
+      encoding: clickhouse_json
+    metrics:
+      topic: glassflow_metrics
+      encoding: clickhouse_json
+    logs:
+      topic: glassflow_logs
+      encoding: clickhouse_json
+service:
+  pipelines:
+    logs:
+      exporters: [glassflow]
+    traces:
+      exporters: [glassflow]
+    metrics:
+      exporters: [glassflow]
