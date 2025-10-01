@@ -43,7 +43,21 @@ Kafka client parameters:
 - `tls` (optional)
   - TLS settings for encrypted connections (enable/disable, certificates).
 - `auth` (optional)
-  - SASL authentication settings (mechanism, username, password, etc.).
+  - Authentication settings supporting multiple mechanisms:
+    - `sasl` - SASL authentication with multiple mechanisms:
+      - `mechanism`: `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`, or `AWS_MSK_IAM_OAUTHBEARER`
+      - `username` and `password` (required for PLAIN and SCRAM mechanisms)
+      - `version`: SASL protocol version (0 or 1, default: 0)
+      - `aws_msk.region`: AWS region for AWS_MSK_IAM_OAUTHBEARER mechanism
+    - `kerberos` - Kerberos authentication:
+      - `service_name`: Kerberos service name (default: kafka)
+      - `realm`: Kerberos realm
+      - `use_keytab`: Use keytab instead of password
+      - `username` and `password`: Kerberos credentials
+      - `config_file`: Path to Kerberos config (e.g., /etc/krb5.conf)
+      - `keytab_file`: Path to keytab file
+      - `disable_fast_negotiation`: Disable PA-FX-FAST negotiation
+    - `plain_text` (deprecated): Use `sasl` with `mechanism: PLAIN` instead
 - `protocol_version`, other advanced client fields (optional)
   - Advanced Kafka client tuning for compatibility/metadata behavior.
 
@@ -122,6 +136,78 @@ Notes:
   - Traces: key by trace ID
   - Logs/Metrics: key by `service.name` (if present), otherwise empty
 
+### Authentication
+
+The glassflowexporter supports multiple authentication mechanisms through the `auth` configuration section:
+
+#### SASL Authentication
+
+SASL (Simple Authentication and Security Layer) supports several mechanisms:
+
+**PLAIN Authentication:**
+```yaml
+auth:
+  sasl:
+    mechanism: PLAIN
+    username: your_username
+    password: your_password
+    version: 0
+```
+
+**SCRAM-SHA-256/SCRAM-SHA-512:**
+```yaml
+auth:
+  sasl:
+    mechanism: SCRAM-SHA-256  # or SCRAM-SHA-512
+    username: your_username
+    password: your_password
+    version: 0
+```
+
+**AWS MSK IAM OAuth Bearer:**
+```yaml
+auth:
+  sasl:
+    mechanism: AWS_MSK_IAM_OAUTHBEARER
+    aws_msk:
+      region: us-east-1
+```
+
+#### Kerberos Authentication
+
+```yaml
+auth:
+  kerberos:
+    service_name: kafka
+    realm: EXAMPLE.COM
+    use_keytab: true
+    username: kafka
+    config_file: /etc/krb5.conf
+    keytab_file: /etc/security/kafka.keytab
+    disable_fast_negotiation: false
+```
+
+#### TLS Configuration
+
+```yaml
+tls:
+  ca_file: /path/to/ca.pem
+  cert_file: /path/to/cert.pem
+  key_file: /path/to/key.pem
+  insecure: false
+```
+
+#### Legacy Plain Text (Deprecated)
+
+```yaml
+auth:
+  plain_text:
+    username: your_username
+    password: your_password
+```
+
+> **Note:** The `plain_text` authentication is deprecated. Use `sasl` with `mechanism: PLAIN` instead.
+
 ### Example
 
 ```yaml
@@ -144,11 +230,27 @@ exporters:
     tls:
       insecure: true
     auth:
-      # example (SASL/PLAIN). Leave empty if not needed.
-      # sasl:
-      #   mechanism: PLAIN
-      #   username: user
-      #   password: pass
+      # SASL authentication examples (uncomment and configure as needed):
+      sasl:
+        mechanism: PLAIN
+        username: user
+        password: pass
+        version: 0
+      # Alternative SASL mechanisms:
+      # mechanism: SCRAM-SHA-256
+      # mechanism: SCRAM-SHA-512
+      # mechanism: AWS_MSK_IAM_OAUTHBEARER
+      #   aws_msk:
+      #     region: us-east-1
+      # Kerberos authentication:
+      # kerberos:
+      #   service_name: kafka
+      #   realm: EXAMPLE.COM
+      #   use_keytab: true
+      #   username: kafka
+      #   config_file: /etc/krb5.conf
+      #   keytab_file: /etc/security/kafka.keytab
+      #   disable_fast_negotiation: false
 
     # Producer
     producer:

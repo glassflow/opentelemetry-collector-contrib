@@ -33,7 +33,7 @@ func pushLogs(ctx context.Context, ld plog.Logs) error {
 func startLogs(ctx context.Context, _ component.Host) error {
 	if logsCfg != nil && !logsCfg.DryRun {
 		if logsCfg.Logs.Enabled && logsCfg.Logs.Topic.Name != "" && logsCfg.Logs.Topic.Create {
-			_ = producer.EnsureTopics(ctx, logsCfg.ClientConfig.Brokers, map[string]producer.TopicSpec{
+			_ = producer.EnsureTopics(ctx, logsCfg.ClientConfig, map[string]producer.TopicSpec{
 				logsCfg.Logs.Topic.Name: {
 					Enabled:           true,
 					NumPartitions:     logsCfg.Logs.Topic.NumPartitions,

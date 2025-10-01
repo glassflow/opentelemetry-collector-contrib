@@ -33,7 +33,7 @@ func pushTraces(ctx context.Context, td ptrace.Traces) error {
 func startTraces(ctx context.Context, _ component.Host) error {
 	if tracesCfg != nil && !tracesCfg.DryRun {
 		if tracesCfg.Traces.Enabled && tracesCfg.Traces.Topic.Name != "" && tracesCfg.Traces.Topic.Create {
-			_ = producer.EnsureTopics(ctx, tracesCfg.ClientConfig.Brokers, map[string]producer.TopicSpec{
+			_ = producer.EnsureTopics(ctx, tracesCfg.ClientConfig, map[string]producer.TopicSpec{
 				tracesCfg.Traces.Topic.Name: {
 					Enabled:           true,
 					NumPartitions:     tracesCfg.Traces.Topic.NumPartitions,

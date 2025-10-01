@@ -32,7 +32,7 @@ func createDefaultConfig() component.Config {
 		BackOffConfig:    configretry.NewDefaultBackOffConfig(),
 		QueueBatchConfig: exporterhelper.NewDefaultQueueConfig(),
 		DryRun:           false,
-		Producer:         configkafka.ProducerConfig{MaxMessageBytes: 1000000, RequiredAcks: -1},
+		Producer:         configkafka.ProducerConfig{MaxMessageBytes: 1000000, RequiredAcks: -1, Compression: "none"},
 		Traces:           SignalConfig{Enabled: true, Encoding: "json", Topic: TopicSpec{Name: "otel-traces", Create: true, NumPartitions: 1, ReplicationFactor: 1}},
 		Metrics:          MetricsConfig{Sum: SignalConfig{Enabled: true, Encoding: "json", Topic: TopicSpec{Name: "otel-metrics-sum", Create: true, NumPartitions: 1, ReplicationFactor: 1}}},
 		Logs:             SignalConfig{Enabled: true, Encoding: "json", Topic: TopicSpec{Name: "otel-logs", Create: true, NumPartitions: 1, ReplicationFactor: 1}},

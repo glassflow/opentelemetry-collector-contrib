@@ -47,7 +47,7 @@ func pushMetrics(ctx context.Context, md pmetric.Metrics) error {
 
 func startMetrics(ctx context.Context, _ component.Host) error {
 	if metricsCfg != nil && !metricsCfg.DryRun {
-		_ = producer.EnsureTopics(ctx, metricsCfg.ClientConfig.Brokers, map[string]producer.TopicSpec{
+		_ = producer.EnsureTopics(ctx, metricsCfg.ClientConfig, map[string]producer.TopicSpec{
 			metricsCfg.Metrics.Gauge.Topic.Name: {
 				Enabled:           metricsCfg.Metrics.Gauge.Enabled && metricsCfg.Metrics.Gauge.Topic.Name != "" && metricsCfg.Metrics.Gauge.Topic.Create,
 				NumPartitions:     metricsCfg.Metrics.Gauge.Topic.NumPartitions,
