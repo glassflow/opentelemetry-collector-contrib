@@ -9,8 +9,10 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.uber.org/zap"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/glassflowexporter/internal/messenger"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/glassflowexporter/internal/metadata"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/glassflowexporter/internal/producer"
 )
 
@@ -41,7 +43,7 @@ func startTraces(ctx context.Context, _ component.Host) error {
 				},
 			})
 		}
-		p, err := producer.NewSaramaProducer(ctx, tracesCfg.ClientConfig, tracesCfg.Producer, tracesCfg.TimeoutSettings.Timeout)
+		p, err := producer.NewSaramaProducer(ctx, tracesCfg.ClientConfig, tracesCfg.Producer, tracesCfg.TimeoutSettings.Timeout, tracesLogger, tracesDebug, tracesMetrics)
 		if err != nil {
 			return err
 		}
@@ -62,5 +64,13 @@ var _ = exporterhelper.NewTraces
 
 var tracesCfg *Config
 var tracesProd producer.Producer
+var tracesLogger *zap.Logger
+var tracesDebug bool
+var tracesMetrics *metadata.Metrics
 
-func setTracesConfig(c *Config) { tracesCfg = c }
+func setTracesConfig(c *Config, logger *zap.Logger, metrics *metadata.Metrics) {
+	tracesCfg = c
+	tracesLogger = logger
+	tracesDebug = c.Debug
+	tracesMetrics = metrics
+}

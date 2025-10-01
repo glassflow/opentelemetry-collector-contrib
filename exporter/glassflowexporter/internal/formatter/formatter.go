@@ -6,6 +6,7 @@ package formatter // import "github.com/open-telemetry/opentelemetry-collector-c
 import (
 	"encoding/hex"
 	"encoding/json"
+	"math"
 	"time"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -20,7 +21,24 @@ type Message struct {
 	Value []byte
 }
 
-// LogsToJSON returns ClickHouse-shaped JSON messages for logs.
+// sanitizeFloat64 converts NaN and Infinity values to JSON-compatible values
+// NaN becomes nil (JSON null), +Inf becomes a large positive number, -Inf becomes a large negative number
+func sanitizeFloat64(value float64) interface{} {
+	if math.IsNaN(value) {
+		return nil // JSON null - more semantically correct
+	}
+	if math.IsInf(value, 1) {
+		return math.MaxFloat64
+	}
+	if math.IsInf(value, -1) {
+		return -math.MaxFloat64
+	}
+	return value
+}
+
+// Utility functions for custom formatter mode (when marshaler_type = "custom")
+
+// LogsToJSON returns ClickHouse-shaped JSON messages for logs (custom formatter mode).
 func LogsToJSON(ld plog.Logs) ([]Message, int, error) {
 	var out []Message
 	count := 0
@@ -72,7 +90,7 @@ func LogsToJSON(ld plog.Logs) ([]Message, int, error) {
 	return out, count, nil
 }
 
-// TracesToJSON returns ClickHouse-shaped JSON messages for traces.
+// TracesToJSON returns ClickHouse-shaped JSON messages for traces (custom formatter mode).
 func TracesToJSON(td ptrace.Traces) ([]Message, int, error) {
 	var out []Message
 	count := 0
@@ -125,7 +143,7 @@ func TracesToJSON(td ptrace.Traces) ([]Message, int, error) {
 	return out, count, nil
 }
 
-// MetricsToJSON returns ClickHouse-shaped JSON messages for metrics by datapoint.
+// MetricsToJSON returns ClickHouse-shaped JSON messages for metrics by datapoint (custom formatter mode).
 func MetricsToJSON(md pmetric.Metrics) ([]Message, int, error) {
 	var out []Message
 	count := 0
@@ -188,7 +206,8 @@ func MetricsToJSON(md pmetric.Metrics) ([]Message, int, error) {
 	return out, count, nil
 }
 
-// helpers
+// Helper functions
+
 func attributesToStringMap(attrs pcommon.Map) map[string]string {
 	out := make(map[string]string, attrs.Len())
 	attrs.Range(func(k string, v pcommon.Value) bool {
@@ -258,7 +277,8 @@ func getServiceName(attrs pcommon.Map) string {
 	return ""
 }
 
-// processGaugeMetric processes gauge metrics according to ClickHouse gauge table structure
+// Metric processing functions (simplified versions for custom formatter mode)
+
 func processGaugeMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeURL, serviceName string) ([]Message, int, error) {
 	var out []Message
 	count := 0
@@ -272,7 +292,7 @@ func processGaugeMetric(m pmetric.Metric, resMap map[string]string, resURL, scop
 			"ScopeName":             scopeName,
 			"ScopeVersion":          scopeVersion,
 			"ScopeAttributes":       scopeMap,
-			"ScopeDroppedAttrCount": dp.Attributes().Len(), // This is a simplification
+			"ScopeDroppedAttrCount": dp.Attributes().Len(),
 			"ScopeSchemaUrl":        scopeURL,
 			"ServiceName":           serviceName,
 			"MetricName":            m.Name(),
@@ -301,7 +321,6 @@ func processGaugeMetric(m pmetric.Metric, resMap map[string]string, resURL, scop
 	return out, count, nil
 }
 
-// processSumMetric processes sum metrics according to ClickHouse sum table structure
 func processSumMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeURL, serviceName string) ([]Message, int, error) {
 	var out []Message
 	count := 0
@@ -315,7 +334,7 @@ func processSumMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeN
 			"ScopeName":             scopeName,
 			"ScopeVersion":          scopeVersion,
 			"ScopeAttributes":       scopeMap,
-			"ScopeDroppedAttrCount": dp.Attributes().Len(), // This is a simplification
+			"ScopeDroppedAttrCount": dp.Attributes().Len(),
 			"ScopeSchemaUrl":        scopeURL,
 			"ServiceName":           serviceName,
 			"MetricName":            m.Name(),
@@ -346,7 +365,6 @@ func processSumMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeN
 	return out, count, nil
 }
 
-// processHistogramMetric processes histogram metrics according to ClickHouse histogram table structure
 func processHistogramMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeURL, serviceName string) ([]Message, int, error) {
 	var out []Message
 	count := 0
@@ -360,7 +378,7 @@ func processHistogramMetric(m pmetric.Metric, resMap map[string]string, resURL, 
 			"ScopeName":             scopeName,
 			"ScopeVersion":          scopeVersion,
 			"ScopeAttributes":       scopeMap,
-			"ScopeDroppedAttrCount": dp.Attributes().Len(), // This is a simplification
+			"ScopeDroppedAttrCount": dp.Attributes().Len(),
 			"ScopeSchemaUrl":        scopeURL,
 			"ServiceName":           serviceName,
 			"MetricName":            m.Name(),
@@ -395,7 +413,6 @@ func processHistogramMetric(m pmetric.Metric, resMap map[string]string, resURL, 
 	return out, count, nil
 }
 
-// processExpHistogramMetric processes exponential histogram metrics according to ClickHouse exp histogram table structure
 func processExpHistogramMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeURL, serviceName string) ([]Message, int, error) {
 	var out []Message
 	count := 0
@@ -409,7 +426,7 @@ func processExpHistogramMetric(m pmetric.Metric, resMap map[string]string, resUR
 			"ScopeName":             scopeName,
 			"ScopeVersion":          scopeVersion,
 			"ScopeAttributes":       scopeMap,
-			"ScopeDroppedAttrCount": dp.Attributes().Len(), // This is a simplification
+			"ScopeDroppedAttrCount": dp.Attributes().Len(),
 			"ScopeSchemaUrl":        scopeURL,
 			"ServiceName":           serviceName,
 			"MetricName":            m.Name(),
@@ -448,7 +465,6 @@ func processExpHistogramMetric(m pmetric.Metric, resMap map[string]string, resUR
 	return out, count, nil
 }
 
-// processSummaryMetric processes summary metrics according to ClickHouse summary table structure
 func processSummaryMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeURL, serviceName string) ([]Message, int, error) {
 	var out []Message
 	count := 0
@@ -462,7 +478,7 @@ func processSummaryMetric(m pmetric.Metric, resMap map[string]string, resURL, sc
 			"ScopeName":             scopeName,
 			"ScopeVersion":          scopeVersion,
 			"ScopeAttributes":       scopeMap,
-			"ScopeDroppedAttrCount": dp.Attributes().Len(), // This is a simplification
+			"ScopeDroppedAttrCount": dp.Attributes().Len(),
 			"ScopeSchemaUrl":        scopeURL,
 			"ServiceName":           serviceName,
 			"MetricName":            m.Name(),
@@ -492,8 +508,8 @@ func processSummaryMetric(m pmetric.Metric, resMap map[string]string, resURL, sc
 // ExemplarData holds converted exemplar data
 type ExemplarData struct {
 	Attrs    []map[string]string
-	Times    []time.Time
-	Values   []float64
+	Times    []interface{}
+	Values   []interface{}
 	SpanIDs  []string
 	TraceIDs []string
 }
@@ -501,8 +517,8 @@ type ExemplarData struct {
 // convertExemplars converts exemplars to the format expected by ClickHouse
 func convertExemplars(exemplars pmetric.ExemplarSlice) ExemplarData {
 	var attrs []map[string]string
-	var times []time.Time
-	var values []float64
+	var times []interface{}
+	var values []interface{}
 	var spanIDs []string
 	var traceIDs []string
 
@@ -521,27 +537,27 @@ func convertExemplars(exemplars pmetric.ExemplarSlice) ExemplarData {
 
 // QuantileData holds converted quantile data
 type QuantileData struct {
-	Quantiles []float64
-	Values    []float64
+	Quantiles []interface{}
+	Values    []interface{}
 }
 
 // convertValueAtQuantiles converts quantile values to the format expected by ClickHouse
 func convertValueAtQuantiles(quantiles pmetric.SummaryDataPointValueAtQuantileSlice) QuantileData {
-	var qs []float64
-	var vs []float64
+	var qs []interface{}
+	var vs []interface{}
 	for i := 0; i < quantiles.Len(); i++ {
 		q := quantiles.At(i)
-		qs = append(qs, q.Quantile())
-		vs = append(vs, q.Value())
+		qs = append(qs, sanitizeFloat64(q.Quantile()))
+		vs = append(vs, sanitizeFloat64(q.Value()))
 	}
 	return QuantileData{Quantiles: qs, Values: vs}
 }
 
 // getValue extracts the numeric value from a data point, handling both int and double types
-func getValue(intValue int64, floatValue float64, valueType pmetric.NumberDataPointValueType) float64 {
+func getValue(intValue int64, floatValue float64, valueType pmetric.NumberDataPointValueType) interface{} {
 	switch valueType {
 	case pmetric.NumberDataPointValueTypeDouble:
-		return floatValue
+		return sanitizeFloat64(floatValue)
 	case pmetric.NumberDataPointValueTypeInt:
 		return float64(intValue)
 	case pmetric.NumberDataPointValueTypeEmpty:
@@ -552,10 +568,10 @@ func getValue(intValue int64, floatValue float64, valueType pmetric.NumberDataPo
 }
 
 // getExemplarValue extracts the numeric value from an exemplar, handling both int and double types
-func getExemplarValue(intValue int64, floatValue float64, valueType pmetric.ExemplarValueType) float64 {
+func getExemplarValue(intValue int64, floatValue float64, valueType pmetric.ExemplarValueType) interface{} {
 	switch valueType {
 	case pmetric.ExemplarValueTypeDouble:
-		return floatValue
+		return sanitizeFloat64(floatValue)
 	case pmetric.ExemplarValueTypeInt:
 		return float64(intValue)
 	case pmetric.ExemplarValueTypeEmpty:

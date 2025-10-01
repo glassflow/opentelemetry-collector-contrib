@@ -25,6 +25,9 @@ type Config struct {
 	// This is enabled by default for safer local testing and unit tests.
 	DryRun bool `mapstructure:"dry_run"`
 
+	// Debug, when true, enables verbose logging for debugging Kafka issues.
+	Debug bool `mapstructure:"debug"`
+
 	// Per-signal configuration
 	Traces  SignalConfig  `mapstructure:"traces"`
 	Metrics MetricsConfig `mapstructure:"metrics"`
@@ -53,6 +56,76 @@ type MetricsConfig struct {
 	Histogram            SignalConfig `mapstructure:"histogram"`
 	ExponentialHistogram SignalConfig `mapstructure:"exponential_histogram"`
 	Summary              SignalConfig `mapstructure:"summary"`
+}
+
+// NewDefaultSignalConfig creates a SignalConfig with sensible defaults
+func NewDefaultSignalConfig(name string) SignalConfig {
+	return SignalConfig{
+		Enabled:  true,
+		Encoding: "json",
+		Topic: TopicSpec{
+			Name:              name,
+			Create:            true,
+			NumPartitions:     1,
+			ReplicationFactor: 1,
+		},
+	}
+}
+
+// NewDefaultMetricsConfig creates a MetricsConfig with sensible defaults
+func NewDefaultMetricsConfig() MetricsConfig {
+	return MetricsConfig{
+		Gauge: SignalConfig{
+			Enabled:  false,
+			Encoding: "json",
+			Topic: TopicSpec{
+				Name:              "otel-metrics-gauge",
+				Create:            true,
+				NumPartitions:     1,
+				ReplicationFactor: 1,
+			},
+		},
+		Sum: SignalConfig{
+			Enabled:  true,
+			Encoding: "json",
+			Topic: TopicSpec{
+				Name:              "otel-metrics-sum",
+				Create:            true,
+				NumPartitions:     1,
+				ReplicationFactor: 1,
+			},
+		},
+		Histogram: SignalConfig{
+			Enabled:  false,
+			Encoding: "json",
+			Topic: TopicSpec{
+				Name:              "otel-metrics-histogram",
+				Create:            true,
+				NumPartitions:     1,
+				ReplicationFactor: 1,
+			},
+		},
+		ExponentialHistogram: SignalConfig{
+			Enabled:  false,
+			Encoding: "json",
+			Topic: TopicSpec{
+				Name:              "otel-metrics-exponential-histogram",
+				Create:            true,
+				NumPartitions:     1,
+				ReplicationFactor: 1,
+			},
+		},
+		Summary: SignalConfig{
+			Enabled:  false,
+			Encoding: "json",
+			Topic: TopicSpec{
+				Name:              "otel-metrics-summary",
+				Create:            true,
+				NumPartitions:     1,
+				ReplicationFactor: 1,
+			},
+		},
+	}
 }
 
 func (c *Config) Validate() error { return nil }

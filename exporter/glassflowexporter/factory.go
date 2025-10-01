@@ -33,16 +33,24 @@ func createDefaultConfig() component.Config {
 		QueueBatchConfig: exporterhelper.NewDefaultQueueConfig(),
 		DryRun:           false,
 		Producer:         configkafka.ProducerConfig{MaxMessageBytes: 1000000, RequiredAcks: -1, Compression: "none"},
-		Traces:           SignalConfig{Enabled: true, Encoding: "json", Topic: TopicSpec{Name: "otel-traces", Create: true, NumPartitions: 1, ReplicationFactor: 1}},
-		Metrics:          MetricsConfig{Sum: SignalConfig{Enabled: true, Encoding: "json", Topic: TopicSpec{Name: "otel-metrics-sum", Create: true, NumPartitions: 1, ReplicationFactor: 1}}},
-		Logs:             SignalConfig{Enabled: true, Encoding: "json", Topic: TopicSpec{Name: "otel-logs", Create: true, NumPartitions: 1, ReplicationFactor: 1}},
+		Traces:           NewDefaultSignalConfig("otel-traces"),
+		Metrics:          NewDefaultMetricsConfig(),
+		Logs:             NewDefaultSignalConfig("otel-logs"),
 	}
 }
 
 func createLogsExporter(ctx context.Context, set exporter.Settings, cfg component.Config) (exporter.Logs, error) {
 	c := cfg.(*Config)
+
+	// Create telemetry builder and metrics
+	tb, err := metadata.NewTelemetryBuilder(set.TelemetrySettings)
+	if err != nil {
+		return nil, err
+	}
+	metrics := tb.NewMetrics()
+
 	// capture config for push path
-	setLogsConfig(c)
+	setLogsConfig(c, set.Logger, metrics)
 	// In tests, brokers may be empty; force NOP producer via DryRun to avoid startup errors.
 	if len(c.ClientConfig.Brokers) == 0 {
 		c.DryRun = true
@@ -58,7 +66,15 @@ func createLogsExporter(ctx context.Context, set exporter.Settings, cfg componen
 
 func createTracesExporter(ctx context.Context, set exporter.Settings, cfg component.Config) (exporter.Traces, error) {
 	c := cfg.(*Config)
-	setTracesConfig(c)
+
+	// Create telemetry builder and metrics
+	tb, err := metadata.NewTelemetryBuilder(set.TelemetrySettings)
+	if err != nil {
+		return nil, err
+	}
+	metrics := tb.NewMetrics()
+
+	setTracesConfig(c, set.Logger, metrics)
 	if len(c.ClientConfig.Brokers) == 0 {
 		c.DryRun = true
 	}
@@ -73,7 +89,15 @@ func createTracesExporter(ctx context.Context, set exporter.Settings, cfg compon
 
 func createMetricsExporter(ctx context.Context, set exporter.Settings, cfg component.Config) (exporter.Metrics, error) {
 	c := cfg.(*Config)
-	setMetricsConfig(c)
+
+	// Create telemetry builder and metrics
+	tb, err := metadata.NewTelemetryBuilder(set.TelemetrySettings)
+	if err != nil {
+		return nil, err
+	}
+	metrics := tb.NewMetrics()
+
+	setMetricsConfig(c, set.Logger, metrics)
 	if len(c.ClientConfig.Brokers) == 0 {
 		c.DryRun = true
 	}

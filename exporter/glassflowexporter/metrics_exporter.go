@@ -9,8 +9,10 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.uber.org/zap"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/glassflowexporter/internal/messenger"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/glassflowexporter/internal/metadata"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/glassflowexporter/internal/producer"
 )
 
@@ -74,7 +76,7 @@ func startMetrics(ctx context.Context, _ component.Host) error {
 				ReplicationFactor: metricsCfg.Metrics.Summary.Topic.ReplicationFactor,
 			},
 		})
-		p, err := producer.NewSaramaProducer(ctx, metricsCfg.ClientConfig, metricsCfg.Producer, metricsCfg.TimeoutSettings.Timeout)
+		p, err := producer.NewSaramaProducer(ctx, metricsCfg.ClientConfig, metricsCfg.Producer, metricsCfg.TimeoutSettings.Timeout, metricsLogger, metricsDebug, metricsMetrics)
 		if err != nil {
 			return err
 		}
@@ -95,7 +97,14 @@ func shutdownMetrics(context.Context) error {
 var _ = exporterhelper.NewMetrics
 
 var metricsCfg *Config
-
-func setMetricsConfig(c *Config) { metricsCfg = c }
-
 var metricsProd producer.Producer
+var metricsLogger *zap.Logger
+var metricsDebug bool
+var metricsMetrics *metadata.Metrics
+
+func setMetricsConfig(c *Config, logger *zap.Logger, metrics *metadata.Metrics) {
+	metricsCfg = c
+	metricsLogger = logger
+	metricsDebug = c.Debug
+	metricsMetrics = metrics
+}

@@ -34,6 +34,7 @@ func Logs(ld plog.Logs, strat PartitionStrategy) ([]formatter.Message, int, erro
 	if err != nil {
 		return nil, 0, err
 	}
+
 	// compute keys in the same iteration order as formatter.LogsToJSON
 	if strat == PartitionByService {
 		idx := 0
@@ -65,6 +66,7 @@ func Traces(td ptrace.Traces, strat PartitionStrategy) ([]formatter.Message, int
 	if err != nil {
 		return nil, 0, err
 	}
+
 	if strat == PartitionByTraceID {
 		idx := 0
 		rss := td.ResourceSpans()
