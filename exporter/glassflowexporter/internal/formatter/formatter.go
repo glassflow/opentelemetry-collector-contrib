@@ -65,10 +65,10 @@ func LogsToJSON(ld plog.Logs) ([]Message, int, error) {
 					ts = lr.ObservedTimestamp()
 				}
 				obj := map[string]any{
-					"TimestampTime":      ts.AsTime(),
+					"Timestamp":          ts.AsTime(),
 					"TraceId":            traceIDHex(lr.TraceID()),
 					"SpanId":             spanIDHex(lr.SpanID()),
-					"Flags":              uint8(lr.Flags()),
+					"TraceFlags":         uint8(lr.Flags()),
 					"SeverityText":       lr.SeverityText(),
 					"SeverityNumber":     uint8(lr.SeverityNumber()),
 					"ServiceName":        serviceName,
@@ -126,13 +126,13 @@ func TracesToJSON(td ptrace.Traces) ([]Message, int, error) {
 					"Duration":           int64(dur),
 					"StatusCode":         span.Status().Code().String(),
 					"StatusMessage":      span.Status().Message(),
-					"Events.Time":        evTimes,
+					"Events.Timestamp":   evTimes,
 					"Events.Name":        evNames,
-					"Events.Attrs":       evAttrs,
+					"Events.Attributes":  evAttrs,
 					"Links.TraceId":      linkTIDs,
 					"Links.SpanId":       linkSIDs,
 					"Links.TraceState":   linkStates,
-					"Links.Attrs":        linkAttrs,
+					"Links.Attributes":   linkAttrs,
 				}
 				b, _ := json.Marshal(obj)
 				out = append(out, Message{Value: b})
@@ -159,41 +159,42 @@ func MetricsToJSON(md pmetric.Metrics) ([]Message, int, error) {
 			scopeName := scope.Name()
 			scopeVersion := scope.Version()
 			scopeMap := attributesToStringMap(scope.Attributes())
+			scopeDropped := uint32(scope.DroppedAttributesCount())
 			ms := sm.Metrics()
 			for k := 0; k < ms.Len(); k++ {
 				m := ms.At(k)
 				// Process each metric type according to ClickHouse table structure
 				switch m.Type() {
 				case pmetric.MetricTypeGauge:
-					msgs, n, err := processGaugeMetric(m, resMap, rm.SchemaUrl(), scopeName, scopeVersion, scopeMap, sm.SchemaUrl(), serviceName)
+					msgs, n, err := processGaugeMetric(m, resMap, rm.SchemaUrl(), scopeName, scopeVersion, scopeMap, scopeDropped, sm.SchemaUrl(), serviceName)
 					if err != nil {
 						return nil, 0, err
 					}
 					out = append(out, msgs...)
 					count += n
 				case pmetric.MetricTypeSum:
-					msgs, n, err := processSumMetric(m, resMap, rm.SchemaUrl(), scopeName, scopeVersion, scopeMap, sm.SchemaUrl(), serviceName)
+					msgs, n, err := processSumMetric(m, resMap, rm.SchemaUrl(), scopeName, scopeVersion, scopeMap, scopeDropped, sm.SchemaUrl(), serviceName)
 					if err != nil {
 						return nil, 0, err
 					}
 					out = append(out, msgs...)
 					count += n
 				case pmetric.MetricTypeHistogram:
-					msgs, n, err := processHistogramMetric(m, resMap, rm.SchemaUrl(), scopeName, scopeVersion, scopeMap, sm.SchemaUrl(), serviceName)
+					msgs, n, err := processHistogramMetric(m, resMap, rm.SchemaUrl(), scopeName, scopeVersion, scopeMap, scopeDropped, sm.SchemaUrl(), serviceName)
 					if err != nil {
 						return nil, 0, err
 					}
 					out = append(out, msgs...)
 					count += n
 				case pmetric.MetricTypeExponentialHistogram:
-					msgs, n, err := processExpHistogramMetric(m, resMap, rm.SchemaUrl(), scopeName, scopeVersion, scopeMap, sm.SchemaUrl(), serviceName)
+					msgs, n, err := processExpHistogramMetric(m, resMap, rm.SchemaUrl(), scopeName, scopeVersion, scopeMap, scopeDropped, sm.SchemaUrl(), serviceName)
 					if err != nil {
 						return nil, 0, err
 					}
 					out = append(out, msgs...)
 					count += n
 				case pmetric.MetricTypeSummary:
-					msgs, n, err := processSummaryMetric(m, resMap, rm.SchemaUrl(), scopeName, scopeVersion, scopeMap, sm.SchemaUrl(), serviceName)
+					msgs, n, err := processSummaryMetric(m, resMap, rm.SchemaUrl(), scopeName, scopeVersion, scopeMap, scopeDropped, sm.SchemaUrl(), serviceName)
 					if err != nil {
 						return nil, 0, err
 					}
@@ -279,7 +280,7 @@ func getServiceName(attrs pcommon.Map) string {
 
 // Metric processing functions (simplified versions for custom formatter mode)
 
-func processGaugeMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeURL, serviceName string) ([]Message, int, error) {
+func processGaugeMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeDropped uint32, scopeURL, serviceName string) ([]Message, int, error) {
 	var out []Message
 	count := 0
 	gauge := m.Gauge()
@@ -292,7 +293,7 @@ func processGaugeMetric(m pmetric.Metric, resMap map[string]string, resURL, scop
 			"ScopeName":             scopeName,
 			"ScopeVersion":          scopeVersion,
 			"ScopeAttributes":       scopeMap,
-			"ScopeDroppedAttrCount": dp.Attributes().Len(),
+			"ScopeDroppedAttrCount": scopeDropped,
 			"ScopeSchemaUrl":        scopeURL,
 			"ServiceName":           serviceName,
 			"MetricName":            m.Name(),
@@ -321,7 +322,7 @@ func processGaugeMetric(m pmetric.Metric, resMap map[string]string, resURL, scop
 	return out, count, nil
 }
 
-func processSumMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeURL, serviceName string) ([]Message, int, error) {
+func processSumMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeDropped uint32, scopeURL, serviceName string) ([]Message, int, error) {
 	var out []Message
 	count := 0
 	sum := m.Sum()
@@ -334,7 +335,7 @@ func processSumMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeN
 			"ScopeName":             scopeName,
 			"ScopeVersion":          scopeVersion,
 			"ScopeAttributes":       scopeMap,
-			"ScopeDroppedAttrCount": dp.Attributes().Len(),
+			"ScopeDroppedAttrCount": scopeDropped,
 			"ScopeSchemaUrl":        scopeURL,
 			"ServiceName":           serviceName,
 			"MetricName":            m.Name(),
@@ -365,7 +366,7 @@ func processSumMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeN
 	return out, count, nil
 }
 
-func processHistogramMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeURL, serviceName string) ([]Message, int, error) {
+func processHistogramMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeDropped uint32, scopeURL, serviceName string) ([]Message, int, error) {
 	var out []Message
 	count := 0
 	histogram := m.Histogram()
@@ -378,7 +379,7 @@ func processHistogramMetric(m pmetric.Metric, resMap map[string]string, resURL, 
 			"ScopeName":             scopeName,
 			"ScopeVersion":          scopeVersion,
 			"ScopeAttributes":       scopeMap,
-			"ScopeDroppedAttrCount": dp.Attributes().Len(),
+			"ScopeDroppedAttrCount": scopeDropped,
 			"ScopeSchemaUrl":        scopeURL,
 			"ServiceName":           serviceName,
 			"MetricName":            m.Name(),
@@ -413,7 +414,7 @@ func processHistogramMetric(m pmetric.Metric, resMap map[string]string, resURL, 
 	return out, count, nil
 }
 
-func processExpHistogramMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeURL, serviceName string) ([]Message, int, error) {
+func processExpHistogramMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeDropped uint32, scopeURL, serviceName string) ([]Message, int, error) {
 	var out []Message
 	count := 0
 	expHistogram := m.ExponentialHistogram()
@@ -426,7 +427,7 @@ func processExpHistogramMetric(m pmetric.Metric, resMap map[string]string, resUR
 			"ScopeName":             scopeName,
 			"ScopeVersion":          scopeVersion,
 			"ScopeAttributes":       scopeMap,
-			"ScopeDroppedAttrCount": dp.Attributes().Len(),
+			"ScopeDroppedAttrCount": scopeDropped,
 			"ScopeSchemaUrl":        scopeURL,
 			"ServiceName":           serviceName,
 			"MetricName":            m.Name(),
@@ -465,7 +466,7 @@ func processExpHistogramMetric(m pmetric.Metric, resMap map[string]string, resUR
 	return out, count, nil
 }
 
-func processSummaryMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeURL, serviceName string) ([]Message, int, error) {
+func processSummaryMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeName, scopeVersion string, scopeMap map[string]string, scopeDropped uint32, scopeURL, serviceName string) ([]Message, int, error) {
 	var out []Message
 	count := 0
 	summary := m.Summary()
@@ -478,7 +479,7 @@ func processSummaryMetric(m pmetric.Metric, resMap map[string]string, resURL, sc
 			"ScopeName":             scopeName,
 			"ScopeVersion":          scopeVersion,
 			"ScopeAttributes":       scopeMap,
-			"ScopeDroppedAttrCount": dp.Attributes().Len(),
+			"ScopeDroppedAttrCount": scopeDropped,
 			"ScopeSchemaUrl":        scopeURL,
 			"ServiceName":           serviceName,
 			"MetricName":            m.Name(),
