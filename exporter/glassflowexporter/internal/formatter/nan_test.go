@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -199,6 +200,47 @@ func TestGetExemplarValueWithNaN(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := getExemplarValue(tt.intValue, tt.floatValue, tt.valueType)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestFormatTimeForClickHouse(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    time.Time
+		expected string
+	}{
+		{
+			name:     "UTC time with nanoseconds",
+			input:    time.Date(2025, 10, 2, 15, 48, 30, 979381922, time.UTC),
+			expected: "2025-10-02 15:48:30.979381922",
+		},
+		{
+			name:     "UTC time with zero nanoseconds",
+			input:    time.Date(2025, 10, 2, 15, 48, 30, 0, time.UTC),
+			expected: "2025-10-02 15:48:30.000000000",
+		},
+		{
+			name:     "UTC time with microseconds",
+			input:    time.Date(2025, 10, 2, 15, 48, 30, 123456000, time.UTC),
+			expected: "2025-10-02 15:48:30.123456000",
+		},
+		{
+			name:     "UTC time with milliseconds",
+			input:    time.Date(2025, 10, 2, 15, 48, 30, 123000000, time.UTC),
+			expected: "2025-10-02 15:48:30.123000000",
+		},
+		{
+			name:     "different timezone (should be converted to UTC)",
+			input:    time.Date(2025, 10, 2, 15, 48, 30, 979381922, time.FixedZone("EST", -5*60*60)),
+			expected: "2025-10-02 20:48:30.979381922", // 15:48 EST = 20:48 UTC
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatTimeForClickHouse(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

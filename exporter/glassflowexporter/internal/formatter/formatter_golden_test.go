@@ -59,6 +59,54 @@ func TestTracesToJSON_Golden(t *testing.T) {
 	}
 }
 
+func TestTracesToJSON_EmptyEventsAndLinks(t *testing.T) {
+	td := ptrace.NewTraces()
+	rs := td.ResourceSpans().AppendEmpty()
+	ss := rs.ScopeSpans().AppendEmpty()
+	s := ss.Spans().AppendEmpty()
+	s.SetName("test-span")
+	// No events or links added - should result in empty arrays, not null
+
+	msgs, n, err := TracesToJSON(td)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, n)
+	assert.Len(t, msgs, 1)
+
+	var got map[string]any
+	err = json.Unmarshal(msgs[0].Value, &got)
+	assert.NoError(t, err)
+
+	// Verify that Events fields are empty arrays, not null
+	eventsTimestamp, ok := got["Events.Timestamp"].([]any)
+	assert.True(t, ok, "Events.Timestamp should be an array")
+	assert.Empty(t, eventsTimestamp, "Events.Timestamp should be empty array")
+
+	eventsName, ok := got["Events.Name"].([]any)
+	assert.True(t, ok, "Events.Name should be an array")
+	assert.Empty(t, eventsName, "Events.Name should be empty array")
+
+	eventsAttrs, ok := got["Events.Attributes"].([]any)
+	assert.True(t, ok, "Events.Attributes should be an array")
+	assert.Empty(t, eventsAttrs, "Events.Attributes should be empty array")
+
+	// Verify that Links fields are empty arrays, not null
+	linksTraceId, ok := got["Links.TraceId"].([]any)
+	assert.True(t, ok, "Links.TraceId should be an array")
+	assert.Empty(t, linksTraceId, "Links.TraceId should be empty array")
+
+	linksSpanId, ok := got["Links.SpanId"].([]any)
+	assert.True(t, ok, "Links.SpanId should be an array")
+	assert.Empty(t, linksSpanId, "Links.SpanId should be empty array")
+
+	linksTraceState, ok := got["Links.TraceState"].([]any)
+	assert.True(t, ok, "Links.TraceState should be an array")
+	assert.Empty(t, linksTraceState, "Links.TraceState should be empty array")
+
+	linksAttrs, ok := got["Links.Attributes"].([]any)
+	assert.True(t, ok, "Links.Attributes should be an array")
+	assert.Empty(t, linksAttrs, "Links.Attributes should be empty array")
+}
+
 func TestMetricsToJSON_Golden(t *testing.T) {
 	md := pmetric.NewMetrics()
 	rm := md.ResourceMetrics().AppendEmpty()

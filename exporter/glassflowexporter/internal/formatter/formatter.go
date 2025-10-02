@@ -6,6 +6,7 @@ package formatter // import "github.com/open-telemetry/opentelemetry-collector-c
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math"
 	"time"
 
@@ -65,7 +66,7 @@ func LogsToJSON(ld plog.Logs) ([]Message, int, error) {
 					ts = lr.ObservedTimestamp()
 				}
 				obj := map[string]any{
-					"Timestamp":          ts.AsTime(),
+					"Timestamp":          formatTimeForClickHouse(ts.AsTime()),
 					"TraceId":            traceIDHex(lr.TraceID()),
 					"SpanId":             spanIDHex(lr.SpanID()),
 					"TraceFlags":         uint8(lr.Flags()),
@@ -111,7 +112,7 @@ func TracesToJSON(td ptrace.Traces) ([]Message, int, error) {
 				evTimes, evNames, evAttrs := convertEvents(span.Events())
 				linkTIDs, linkSIDs, linkStates, linkAttrs := convertLinks(span.Links())
 				obj := map[string]any{
-					"Timestamp":          span.StartTimestamp().AsTime(),
+					"Timestamp":          formatTimeForClickHouse(span.StartTimestamp().AsTime()),
 					"TraceId":            traceIDHex(span.TraceID()),
 					"SpanId":             spanIDHex(span.SpanID()),
 					"ParentSpanId":       spanIDHex(span.ParentSpanID()),
@@ -250,10 +251,15 @@ func spanIDHex(id pcommon.SpanID) string {
 	return string(b[:])
 }
 
-func convertEvents(events ptrace.SpanEventSlice) (times []time.Time, names []string, attrs []map[string]string) {
+func convertEvents(events ptrace.SpanEventSlice) (times []string, names []string, attrs []map[string]string) {
+	// Initialize slices to empty instead of nil to avoid JSON null values
+	times = make([]string, 0)
+	names = make([]string, 0)
+	attrs = make([]map[string]string, 0)
+
 	for i := 0; i < events.Len(); i++ {
 		e := events.At(i)
-		times = append(times, e.Timestamp().AsTime())
+		times = append(times, formatTimeForClickHouse(e.Timestamp().AsTime()))
 		names = append(names, e.Name())
 		attrs = append(attrs, attributesToStringMap(e.Attributes()))
 	}
@@ -261,6 +267,12 @@ func convertEvents(events ptrace.SpanEventSlice) (times []time.Time, names []str
 }
 
 func convertLinks(links ptrace.SpanLinkSlice) (traceIDs, spanIDs, states []string, attrs []map[string]string) {
+	// Initialize slices to empty instead of nil to avoid JSON null values
+	traceIDs = make([]string, 0)
+	spanIDs = make([]string, 0)
+	states = make([]string, 0)
+	attrs = make([]map[string]string, 0)
+
 	for i := 0; i < links.Len(); i++ {
 		l := links.At(i)
 		traceIDs = append(traceIDs, traceIDHex(l.TraceID()))
@@ -300,8 +312,8 @@ func processGaugeMetric(m pmetric.Metric, resMap map[string]string, resURL, scop
 			"MetricDescription":     m.Description(),
 			"MetricUnit":            m.Unit(),
 			"Attributes":            attributesToStringMap(dp.Attributes()),
-			"StartTimeUnix":         dp.StartTimestamp().AsTime(),
-			"TimeUnix":              dp.Timestamp().AsTime(),
+			"StartTimeUnix":         formatTimeForClickHouse(dp.StartTimestamp().AsTime()),
+			"TimeUnix":              formatTimeForClickHouse(dp.Timestamp().AsTime()),
 			"Value":                 getValue(dp.IntValue(), dp.DoubleValue(), dp.ValueType()),
 			"Flags":                 uint32(dp.Flags()),
 			"Exemplars": map[string]any{
@@ -342,8 +354,8 @@ func processSumMetric(m pmetric.Metric, resMap map[string]string, resURL, scopeN
 			"MetricDescription":     m.Description(),
 			"MetricUnit":            m.Unit(),
 			"Attributes":            attributesToStringMap(dp.Attributes()),
-			"StartTimeUnix":         dp.StartTimestamp().AsTime(),
-			"TimeUnix":              dp.Timestamp().AsTime(),
+			"StartTimeUnix":         formatTimeForClickHouse(dp.StartTimestamp().AsTime()),
+			"TimeUnix":              formatTimeForClickHouse(dp.Timestamp().AsTime()),
 			"Value":                 getValue(dp.IntValue(), dp.DoubleValue(), dp.ValueType()),
 			"Flags":                 uint32(dp.Flags()),
 			"Exemplars": map[string]any{
@@ -386,8 +398,8 @@ func processHistogramMetric(m pmetric.Metric, resMap map[string]string, resURL, 
 			"MetricDescription":     m.Description(),
 			"MetricUnit":            m.Unit(),
 			"Attributes":            attributesToStringMap(dp.Attributes()),
-			"StartTimeUnix":         dp.StartTimestamp().AsTime(),
-			"TimeUnix":              dp.Timestamp().AsTime(),
+			"StartTimeUnix":         formatTimeForClickHouse(dp.StartTimestamp().AsTime()),
+			"TimeUnix":              formatTimeForClickHouse(dp.Timestamp().AsTime()),
 			"Count":                 dp.Count(),
 			"Sum":                   dp.Sum(),
 			"BucketCounts":          dp.BucketCounts().AsRaw(),
@@ -434,8 +446,8 @@ func processExpHistogramMetric(m pmetric.Metric, resMap map[string]string, resUR
 			"MetricDescription":     m.Description(),
 			"MetricUnit":            m.Unit(),
 			"Attributes":            attributesToStringMap(dp.Attributes()),
-			"StartTimeUnix":         dp.StartTimestamp().AsTime(),
-			"TimeUnix":              dp.Timestamp().AsTime(),
+			"StartTimeUnix":         formatTimeForClickHouse(dp.StartTimestamp().AsTime()),
+			"TimeUnix":              formatTimeForClickHouse(dp.Timestamp().AsTime()),
 			"Count":                 dp.Count(),
 			"Sum":                   dp.Sum(),
 			"Scale":                 dp.Scale(),
@@ -486,8 +498,8 @@ func processSummaryMetric(m pmetric.Metric, resMap map[string]string, resURL, sc
 			"MetricDescription":     m.Description(),
 			"MetricUnit":            m.Unit(),
 			"Attributes":            attributesToStringMap(dp.Attributes()),
-			"StartTimeUnix":         dp.StartTimestamp().AsTime(),
-			"TimeUnix":              dp.Timestamp().AsTime(),
+			"StartTimeUnix":         formatTimeForClickHouse(dp.StartTimestamp().AsTime()),
+			"TimeUnix":              formatTimeForClickHouse(dp.Timestamp().AsTime()),
 			"Count":                 dp.Count(),
 			"Sum":                   dp.Sum(),
 			"ValueAtQuantiles": map[string]any{
@@ -526,7 +538,7 @@ func convertExemplars(exemplars pmetric.ExemplarSlice) ExemplarData {
 	for i := 0; i < exemplars.Len(); i++ {
 		exemplar := exemplars.At(i)
 		attrs = append(attrs, attributesToStringMap(exemplar.FilteredAttributes()))
-		times = append(times, exemplar.Timestamp().AsTime())
+		times = append(times, formatTimeForClickHouse(exemplar.Timestamp().AsTime()))
 		values = append(values, getExemplarValue(exemplar.IntValue(), exemplar.DoubleValue(), exemplar.ValueType()))
 
 		traceID, spanID := exemplar.TraceID(), exemplar.SpanID()
@@ -580,4 +592,16 @@ func getExemplarValue(intValue int64, floatValue float64, valueType pmetric.Exem
 	default:
 		return 0.0
 	}
+}
+
+// formatTimeForClickHouse formats a time.Time to the format expected by ClickHouse DateTime64 fields
+// ClickHouse expects format: "2006-01-02 15:04:05.999999999" (without T and Z)
+func formatTimeForClickHouse(t time.Time) string {
+	// Convert to UTC first
+	utc := t.UTC()
+	// Format as "2006-01-02 15:04:05" and append nanoseconds with proper padding
+	base := utc.Format("2006-01-02 15:04:05")
+	nanos := utc.Nanosecond()
+	// Pad nanoseconds to 9 digits
+	return fmt.Sprintf("%s.%09d", base, nanos)
 }
