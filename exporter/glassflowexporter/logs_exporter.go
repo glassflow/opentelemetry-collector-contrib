@@ -17,7 +17,7 @@ import (
 )
 
 func pushLogs(ctx context.Context, ld plog.Logs) error {
-	msgs, _, err := messenger.Logs(ld, messenger.PartitionByService)
+	msgs, _, err := messenger.Logs(ld, messenger.PartitionByResourceHash)
 	if err != nil {
 		return err
 	}

@@ -17,7 +17,7 @@ import (
 )
 
 func pushMetrics(ctx context.Context, md pmetric.Metrics) error {
-	msgs, _, err := messenger.Metrics(md, messenger.PartitionByService)
+	msgs, _, err := messenger.Metrics(md, messenger.PartitionByResourceHash)
 	if err != nil {
 		return err
 	}
