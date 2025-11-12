@@ -1,0 +1,171 @@
+
+services:
+  kafka:
+    image: bitnamilegacy/kafka:3.6
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_KRAFT_CLUSTER_ID=4L6g3nShT-eMCtK--X86sw
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1 || exit 1"]
+      start_period: 20s
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  kcat:
+    image: confluentinc/cp-kafkacat:7.0.9.arm64
+    container_name: kcat
+    depends_on:
+      kafka:
+        condition: service_healthy
+      otelgen-traces:
+        condition: service_started
+      otelgen-metrics-gauge:
+        condition: service_started
+      otelgen-metrics-sum:
+        condition: service_started
+      otelgen-metrics-hist:
+        condition: service_started
+      otelgen-metrics-exp:
+        condition: service_started
+      otelgen-logs:
+        condition: service_started
+      otelcol:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c"]
+    # Example: consume from topics created by glassflowexporter (cp-kafkacat provides 'kafkacat')
+    command: |
+      "
+      echo 'Waiting for messages...';
+      kafkacat -b kafka:9092 -C -t otel-traces -o beginning -q &
+      kafkacat -b kafka:9092 -C -t otel-metrics -o beginning -q &
+      kafkacat -b kafka:9092 -C -t otel-metrics-gauge -o beginning -q &
+      kafkacat -b kafka:9092 -C -t otel-metrics-sum -o beginning -q &
+      kafkacat -b kafka:9092 -C -t otel-metrics-histogram -o beginning -q &
+      kafkacat -b kafka:9092 -C -t otel-metrics-exp-histogram -o beginning -q &
+      kafkacat -b kafka:9092 -C -t otel-logs -o beginning -q;
+      wait
+      "
+    tty: true
+
+  otelcol:
+    image: europe-west3-docker.pkg.dev/glassflow-dataforge/pocs/otel-collector-glassflow:1.0.4
+    container_name: otelcol
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    command: ["--config", "/etc/otelcol-contrib/config.yaml"]
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+
+  otelgen-traces:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest
+    container_name: otelgen-traces
+    depends_on:
+      otelcol:
+        condition: service_started
+    command: [
+      "traces",
+      "--otlp-insecure=true",
+      "--duration=30s",
+      "--rate=5",
+      "--service=gen-traces",
+      "--otlp-endpoint=otelcol:4317"
+    ]
+
+  otelgen-metrics-gauge:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest
+    container_name: otelgen-metrics-gauge
+    depends_on:
+      otelcol:
+        condition: service_started
+    command: [
+      "metrics",
+      "--otlp-insecure=true",
+      "--duration=30s",
+      "--rate=5",
+      "--service=gen-metrics",
+      "--otlp-endpoint=otelcol:4317",
+      "--metric-type=Gauge"
+    ]
+
+  otelgen-metrics-sum:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest
+    container_name: otelgen-metrics-sum
+    depends_on:
+      otelcol:
+        condition: service_started
+    command: [
+      "metrics",
+      "--otlp-insecure=true",
+      "--duration=30s",
+      "--rate=5",
+      "--service=gen-metrics",
+      "--otlp-endpoint=otelcol:4317",
+      "--metric-type=Sum"
+    ]
+
+  otelgen-metrics-hist:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest
+    container_name: otelgen-metrics-hist
+    depends_on:
+      otelcol:
+        condition: service_started
+    command: [
+      "metrics",
+      "--otlp-insecure=true",
+      "--duration=30s",
+      "--rate=5",
+      "--service=gen-metrics",
+      "--otlp-endpoint=otelcol:4317",
+      "--metric-type=Histogram"
+    ]
+
+  otelgen-metrics-exp:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest
+    container_name: otelgen-metrics-exp
+    depends_on:
+      otelcol:
+        condition: service_started
+    command: [
+      "metrics",
+      "--otlp-insecure=true",
+      "--duration=30s",
+      "--rate=5",
+      "--service=gen-metrics",
+      "--otlp-endpoint=otelcol:4317",
+      "--metric-type=ExponentialHistogram"
+    ]
+
+  otelgen-logs:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest
+    container_name: otelgen-logs
+    depends_on:
+      otelcol:
+        condition: service_started
+    command: [
+      "logs",
+      "--otlp-insecure=true",
+      "--duration=30s",
+      "--rate=5",
+      "--service=gen-logs",
+      "--otlp-endpoint=otelcol:4317"
+    ]
+
+networks:
+  default:
+    name: glassflow-net
+

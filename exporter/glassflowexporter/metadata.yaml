@@ -1,0 +1,7 @@
+type: glassflow
+status:
+  class: exporter
+  stability:
+    development: [logs, metrics, traces]
+  codeowners:
+    active: []

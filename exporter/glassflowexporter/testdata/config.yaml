@@ -1,0 +1,51 @@
+exporters:
+  glassflow:
+    brokers: ["localhost:9092"]
+    traces:
+      topic: glassflow_traces
+      encoding: clickhouse_json
+    metrics:
+      topic: glassflow_metrics
+      encoding: clickhouse_json
+    logs:
+      topic: glassflow_logs
+      encoding: clickhouse_json
+    # Authentication examples (uncomment and configure as needed):
+    # auth:
+    #   sasl:
+    #     mechanism: PLAIN
+    #     username: your_username
+    #     password: your_password
+    #     version: 0
+    #   # Alternative SASL mechanisms:
+    #   # mechanism: SCRAM-SHA-256
+    #   # mechanism: SCRAM-SHA-512
+    #   # mechanism: AWS_MSK_IAM_OAUTHBEARER
+    #   #   aws_msk:
+    #   #     region: us-east-1
+    #   # Kerberos authentication:
+    #   # kerberos:
+    #   #   service_name: kafka
+    #   #   realm: EXAMPLE.COM
+    #   #   use_keytab: true
+    #   #   username: kafka
+    #   #   config_file: /etc/krb5.conf
+    #   #   keytab_file: /etc/security/kafka.keytab
+    #   #   disable_fast_negotiation: false
+    #   # Legacy plain text (deprecated):
+    #   # plain_text:
+    #   #   username: your_username
+    #   #   password: your_password
+    # TLS configuration:
+    # tls:
+    #   ca_file: /path/to/ca.pem
+    #   cert_file: /path/to/cert.pem
+    #   key_file: /path/to/key.pem
+service:
+  pipelines:
+    logs:
+      exporters: [glassflow]
+    traces:
+      exporters: [glassflow]
+    metrics:
+      exporters: [glassflow]
